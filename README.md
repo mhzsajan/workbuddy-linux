@@ -6,15 +6,23 @@
 ![packages](https://img.shields.io/badge/packages-deb%20%7C%20rpm%20%7C%20pkg.tar.zst-informational)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-**WorkBuddy does not ship a Linux desktop build.** This toolchain converts an
-**official WorkBuddy macOS build that you supply** — a China-channel `.dmg` or an
-international-channel `.zip` — into a native Linux application, then packages it
-as `.deb` (Ubuntu, Debian, Linux Mint, Pop!_OS), `.rpm` (Fedora, RHEL, openSUSE)
-or `.pkg.tar.zst` (Arch, Manjaro).
+**WorkBuddy ships no Linux build for its international edition** — and that is
+the edition you need if you cannot log in with a Chinese phone number. This
+toolchain converts an **official WorkBuddy macOS build that you supply** — a
+China-channel `.dmg` or an international-channel `.zip` — into a native Linux
+application, then packages it as `.deb` (Ubuntu, Debian, Linux Mint, Pop!_OS),
+`.rpm` (Fedora, RHEL, openSUSE) or `.pkg.tar.zst` (Arch, Manjaro).
 
 No Wine. No virtual machine. No repackaged installer to trust: you run the
 converter on your own machine, against an archive you downloaded from Tencent
 yourself.
+
+> **Check the official channel first.** The *China* edition does now publish
+> Linux packages — `5.6.2.40046327`, as x86_64 `.deb`, x86_64 `.rpm` and arm64
+> `.deb` — so on Ubuntu/Debian/Fedora with a Chinese account you should install
+> theirs, not this. They are China-edition only: the international CDN has no
+> Linux artifact at all. See [docs/upstream-linux-builds.md](docs/upstream-linux-builds.md)
+> for the verified URLs, sizes and control metadata.
 
 A maintained fork of [`JipZeonGit/workbuddy-linux`](https://github.com/JipZeonGit/workbuddy-linux)
 (MIT). The approach is unchanged — this fork fixes the ways it used to **fail
@@ -48,7 +56,8 @@ silently**, and adds support for the international edition. See
 This is the right project if you searched for any of these:
 
 - *run WorkBuddy on Ubuntu / Debian / Fedora / Arch Linux*
-- *WorkBuddy Linux download* — there is no official Linux desktop build
+- *WorkBuddy Linux download* — the China edition has official `.deb`/`.rpm`
+  packages now; the international edition still has no Linux build at all
 - *convert a macOS `.dmg` to a `.deb`* — specifically an Electron/VS Code app
 - *WorkBuddy login without a Chinese phone number* — see [accounts and regions](#accounts-and-regions)
 - *WorkBuddy "no window" / blank window on Linux* — that is the `E2BIG` bug this fork fixes
@@ -198,6 +207,7 @@ Full evidence, API responses and the SSH port-forward recipe:
 | --- | --- | --- |
 | `WB_ALLOW_UNPATCHED` | `0` | `1` lets the build continue when patching fails. The result will almost certainly show no window. |
 | `WB_NO_SANDBOX` | `1` | `0` re-enables Electron's Chromium sandbox (needs unprivileged user namespaces). |
+| `WB_KEEP_FOREIGN_PLATFORM` | `0` | `1` keeps the `darwin-*` / `win32-*` payload. Only useful for debugging; it adds ~297 MB of binaries that cannot run. |
 | `WORKBUDDY_INSTALL_DIR` | `./workbuddy-app` | Where the converted app is assembled. |
 | `ELECTRON_VERSION` | auto-detected | Force a runtime version if detection falls back. |
 | `ELECTRON_MIRROR` | — | Mirror for the Electron runtime download. Falls back to npmmirror automatically. |
@@ -261,8 +271,11 @@ support.
 
 These come from upstream and are **not** fixed by this fork:
 
-- **Tencent Docs engine removed** — `@tencent/docs-engine` ships only a macOS
-  arm64 `.dylib`, which would `dlopen`-crash on Linux.
+- **Tencent Docs engine removed** — `@tencent/docs-engine` and
+  `@tencent/tencent-docs-ai-engine` ship macOS-only binaries (in 5.9.4 the
+  engine's entire `bin/` is a 233 MB `darwin-x64` tree), which would
+  `dlopen`-crash on Linux. The prune step deletes that payload rather than
+  shipping dead weight.
 - **AI code sandbox degraded** — Tencent's proprietary `vendor/sandbox` has no
   Linux build, so code execution falls back to an unsandboxed terminal or is
   refused.

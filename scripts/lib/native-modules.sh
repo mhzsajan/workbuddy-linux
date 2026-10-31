@@ -8,8 +8,16 @@
 #   2. Rebuild critical native modules from npm source for Linux/Electron
 #   3. Install Linux platform-specific packages (e.g. @lydell/node-pty-linux-x64)
 #   4. Replace CLI vendor binaries (ripgrep) with Linux versions
+#   5. Purge foreign-platform trees AGAIN, because step 2 undoes step 1
 #
-# Audit date: 2026-05-10
+# Step 5 is not redundant. `npm install node-pty` in step 2 copies the whole
+# published module back, including its prebuilds/darwin-* and prebuilds/win32-*
+# directories. Purging only before the rebuild leaves them in the shipped app:
+# 239 MB of darwin payload and 58 MB of win32 payload in a 918 MB tree, the
+# largest single item being @tencent/tencent-docs-ai-engine/bin/darwin-x64 at
+# 233 MB, which has no Linux counterpart at all.
+#
+# Audit date: 2026-05-10, re-audited 2026-10-31 against 5.9.4.
 # See docs/porting-notes.md and the native module audit for full details.
 
 native_module_report() {
@@ -447,6 +455,40 @@ install_linux_platform_packages() {
 }
 
 # ---------------------------------------------------------------------------
+# Phase 5: Final sweep for foreign-platform trees
+# ---------------------------------------------------------------------------
+# Any directory named darwin-* or win32-* is unreachable on Linux. This catches
+# both what the targeted removals in Phase 1 miss (resources/plugins/**/
+# prebuilds, cli/vendor/shim/native, @genie native bins) and what Phase 3 puts
+# back by copying whole npm tarballs over the pruned module.
+purge_foreign_platform_trees() {
+    local app_dir="$1"
+
+    if [ "${WB_KEEP_FOREIGN_PLATFORM:-0}" = "1" ]; then
+        warn "  WB_KEEP_FOREIGN_PLATFORM=1; keeping non-Linux platform trees"
+        return 0
+    fi
+
+    local -a trees=()
+    mapfile -d '' trees < <(find "$app_dir" -mindepth 1 -type d \
+        \( -name 'darwin-*' -o -name 'win32-*' \) -prune -print0 2>/dev/null)
+
+    if [ "${#trees[@]}" -eq 0 ]; then
+        info "  No foreign-platform trees remain"
+        return 0
+    fi
+
+    local total_kb=0 tree kb
+    for tree in "${trees[@]}"; do
+        kb="$(du -sk "$tree" 2>/dev/null | awk '{print $1}')"
+        total_kb=$(( total_kb + ${kb:-0} ))
+        rm -rf "$tree"
+    done
+
+    info "  Removed ${#trees[@]} non-Linux platform tree(s), ${total_kb} KB reclaimed"
+}
+
+# ---------------------------------------------------------------------------
 # Main entry point: rebuild_native_modules
 # ---------------------------------------------------------------------------
 rebuild_native_modules() {
@@ -479,6 +521,13 @@ rebuild_native_modules() {
 
     # Phase 4: Install Linux platform packages
     install_linux_platform_packages "$app_dir"
+    info ""
+
+    # Phase 5: Phase 3 copies whole npm tarballs back over the pruned modules,
+    # restoring the prebuilds Phase 1 deleted. Sweep again now that nothing
+    # else writes to the tree.
+    info "=== Phase 5: Final foreign-platform sweep ==="
+    purge_foreign_platform_trees "$app_dir"
     info ""
 
     # Final verification

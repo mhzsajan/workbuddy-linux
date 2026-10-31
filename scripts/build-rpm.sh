@@ -73,7 +73,8 @@ Release: 1%{?dist}
 Summary: Unofficial local Linux conversion of WorkBuddy
 License: MIT
 BuildArch: $arch
-Requires: gtk3, nss, libXScrnSaver, alsa-lib, libsecret, libxkbfile
+Requires: gtk3, nss, libXScrnSaver, alsa-lib, libsecret, libxkbfile, libnotify, libXtst, xdg-utils, at-spi2-core
+Recommends: libayatana-appindicator-gtk3
 
 %description
 This package is generated locally from a user-owned official WorkBuddy

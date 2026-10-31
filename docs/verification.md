@@ -19,12 +19,13 @@ channel), 504,460,931 bytes, `unzip -tq` clean
 | Bundle selection | `pick_app_bundle` | correct bundle, `__MACOSX` pruned |
 | Electron runtime | mirror download | Electron 37.10.3 |
 | `app.asar` patch | `apply-linux-patches.js` | env shim applied, UI patches skipped (anchors gone) |
-| Converted app | `du -sh workbuddy-app` | 918 MB, 3,666 files |
-| Package build | `scripts/build-deb.sh` | 279 MB `.deb` in 2m 12s |
+| Converted app | `du -sh workbuddy-app` | 918 MB → **621 MB** after the Phase 5 prune |
+| Foreign payload | `purge_foreign_platform_trees` | 15 trees, 303,592 KB reclaimed |
+| Package build | `scripts/build-deb.sh` | **159 MB** `.deb` (was 279 MB before the prune) |
 | Package install | `dpkg -i` | no dependency errors |
-| Launch from `/opt` | `/usr/bin/workbuddy` | 8 processes, window attaches |
+| Launch from `/opt` | `/usr/bin/workbuddy` | 9 processes, window attaches |
 | International endpoint | NetLog | `www.workbuddy.ai/v3/config` → **200** |
-| Login flow | emitted URL | `www.workbuddy.ai/login?platform=workbuddy-ai` |
+| Runtime errors | log scan | 0 `MODULE_NOT_FOUND` / `dlopen` failures after pruning |
 
 ---
 
@@ -45,6 +46,45 @@ to avoid execve E2BIG.
 
 If you see a blank window or no window at all, this patch is why it exists —
 and if it did not apply, that is the reason.
+
+## The purge ran before the step that undid it
+
+The first packaged build was 279 MB and installed 918 MB. Most of that was
+payload that can never execute on Linux — a macOS build carries prebuilt
+binaries for every platform it supports, and they were being copied verbatim
+into the package.
+
+`native-modules.sh` did delete them in Phase 1. But Phase 3 rebuilds `node-pty`
+by running `npm install node-pty@<version>` and copying the whole published
+module back over the pruned one — and the npm tarball ships `prebuilds/darwin-*`
+and `prebuilds/win32-*` inside it. So the purge was always overwritten.
+
+A Phase 5 sweep now runs after everything else:
+
+```
+[INFO]   Removed 15 non-Linux platform tree(s), 303592 KB reclaimed
+918M  workbuddy-app   ->   621M
+279M  .deb            ->   159M
+```
+
+The largest single item was `@tencent/tencent-docs-ai-engine/bin/darwin-x64` at
+233 MB — the Docs engine has no Linux build at all, which is why it is listed as
+a known limitation. Removing its macOS payload costs nothing that was working.
+
+Verified after the prune: 9 processes, `www.workbuddy.ai/v3/config` still 200,
+`[VendorExtract] ensureAll finished: 0 extracted, 7 skipped, 0 failed`, and zero
+`MODULE_NOT_FOUND` or `dlopen` errors in the runtime log. The Linux `node-pty`
+binary (`bin/linux-x64-136/`) is untouched.
+
+## Dependency list
+
+The first `.deb` declared six libraries. Tencent's own Linux package declares
+nine, and the difference is not cosmetic: without `libnotify4` notifications do
+nothing, without `libatspi2.0-0` accessibility is broken, `libxtst6` breaks
+synthetic input. See [upstream-linux-builds.md](upstream-linux-builds.md) for
+the full control file and the `t64` / `ayatana` alternatives now used so one
+stanza covers Ubuntu 22.04 through 26.04.
+
 
 ## Packaging and relocation
 

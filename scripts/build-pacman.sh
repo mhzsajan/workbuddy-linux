@@ -46,7 +46,8 @@ pkgrel=1
 pkgdesc='Unofficial local Linux conversion of WorkBuddy'
 arch=('$arch')
 license=('MIT')
-depends=('gtk3' 'nss' 'libxss' 'alsa-lib' 'libsecret' 'libxkbfile')
+depends=('gtk3' 'nss' 'libxss' 'alsa-lib' 'libsecret' 'libxkbfile' 'libnotify' 'libxtst' 'xdg-utils' 'at-spi2-core' 'util-linux-libs')
+optdepends=('libayatana-appindicator: tray icon on GTK desktops')
 source=()
 sha256sums=()
 

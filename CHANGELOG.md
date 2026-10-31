@@ -10,6 +10,42 @@ build toolchain only. You supply the official WorkBuddy macOS archive.
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-31
+
+Found while reading a sibling project,
+[`JipZeonGit/codebuddy-ide-cn-linux`](https://github.com/JipZeonGit/codebuddy-ide-cn-linux).
+Two of its observations transferred directly; the rest of it did not, because
+this repository already handles native modules more thoroughly.
+
+### Fixed
+
+- **296 MB of non-Linux payload was being shipped.** `native-modules.sh` deleted
+  the `darwin-*` / `win32-*` trees in Phase 1 and then reinstalled `node-pty`
+  from npm in Phase 3, which copies the whole published module back — prebuilds
+  and all. The purge ran before the step that undid it. A final sweep (Phase 5)
+  now runs after everything else: 918 MB → 621 MB, 15 trees, 303,592 KB.
+  `WB_KEEP_FOREIGN_PLATFORM=1` opts out.
+- **Package dependencies were incomplete.** All three formats declared only
+  GTK/NSS/XSS/asound/secret/xkbfile, silently omitting `libnotify4`
+  (notifications), `libxtst6` (synthetic input), `libatspi2.0-0` (accessibility),
+  `libuuid1` and `xdg-utils`. They now match what Tencent's own Linux build
+  declares, with `t64` and `ayatana` alternatives so one stanza works from
+  Ubuntu 22.04 through 26.04. `libayatana-appindicator3-1` is now recommended —
+  without AppIndicator a GTK tray icon cannot appear at all.
+
+### Added
+
+- `docs/upstream-linux-builds.md` — Tencent now publishes **official Linux
+  packages for the China edition** (`5.6.2.40046327`: x86_64 `.deb`, x86_64
+  `.rpm`, arm64 `.deb`), with the verified URLs, sizes and control metadata.
+  The international channel still has none, which is why this project exists.
+
+### Changed
+
+- The README no longer claims "WorkBuddy does not ship a Linux desktop build."
+  That is true only of the international edition. Visitors with a Chinese
+  account are now sent to the official packages instead.
+
 ## [1.2.1] - 2026-10-31
 
 A documentation release. No converter code changed; this records the first
