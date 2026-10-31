@@ -1,0 +1,9 @@
+# Linux-first project: keep every text file LF so builds are identical on
+# every platform and shell scripts do not break.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.woff2 binary
