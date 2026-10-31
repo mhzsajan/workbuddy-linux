@@ -36,11 +36,15 @@ LINUX_PATCHES_SHIM_MARKER="__WB_LINUX_PATCHES_V5__"
 # Returns 0 when the patch set was applied, 1 when it was skipped because
 # WB_ALLOW_UNPATCHED=1 was requested, and aborts the build otherwise.
 #
-# Note: apply-linux-patches.js already exits non-zero (codes 4, 5, ...) when an
-# anchor it needs is missing. The previous version of this wrapper discarded
-# that signal, so a build whose patches failed still reported success and then
-# produced an application that launched with no window. Do not turn these back
-# into warnings: an unpatched app.asar is not a usable build.
+# Note: apply-linux-patches.js exits non-zero (codes 2, 3, 6) when it cannot
+# read, unpack or repack the archive, and the previous version of this wrapper
+# discarded that signal — so a build whose patches failed still reported success
+# and then produced an application that launched with no window. Do not turn
+# these back into warnings.
+#
+# A payload newer than the patch set is different: the patcher then applies the
+# env shim only and returns 0, because that shim is what makes a window appear
+# while the tray/frame patches are cosmetic. That path logs its own warnings.
 apply_linux_runtime_patches() {
     local app_dir="$1"
     local asar_path="$app_dir/resources/app.asar"

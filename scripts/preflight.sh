@@ -46,10 +46,19 @@ DMG payload needs roughly 4 GB."
 }
 
 check_toolchain() {
-    local seven_zip node_major
-    # find_7z exits with a clear message when 7-Zip is missing or older than 21.
-    seven_zip="$(find_7z)"
-    info "7-Zip: $seven_zip"
+    local node_major
+    # 7-Zip is only needed to unpack DMG input. ZIP input (the international
+    # channel) goes through unzip, so demanding 7-Zip there would fail a setup
+    # that is perfectly capable of completing the build.
+    if [ -n "${INPUT:-}" ] && [[ "$INPUT" == *.zip ]]; then
+        require_cmd unzip
+        info "Archive: zip (7-Zip not required)"
+    else
+        local seven_zip
+        # find_7z exits with a clear message when 7-Zip is missing or older than 21.
+        seven_zip="$(find_7z)"
+        info "7-Zip: $seven_zip"
+    fi
 
     require_cmd node
     node_major="$(node -v | sed 's/^v//' | cut -d. -f1)"
@@ -74,7 +83,7 @@ check_input() {
     local size_mb
     size_mb="$(du -m "$INPUT" | awk '{print $1}')"
     if [ "${size_mb:-0}" -lt 50 ]; then
-        error "Input looks too small to be a WorkBuddy DMG: ${size_mb:-0} MB.
+        error "Input looks too small to be a WorkBuddy archive: ${size_mb:-0} MB.
 Did the download finish?"
     fi
     info "Input: $INPUT (${size_mb} MB)"
@@ -84,6 +93,13 @@ Did the download finish?"
         if ! tail -c 512 "$INPUT" 2>/dev/null | grep -qa "koly"; then
             warn "This file does not end with the expected UDIF trailer."
             warn "It may be a partial download or not a DMG at all."
+        fi
+    elif [[ "$INPUT" == *.zip ]]; then
+        # ZIP local file header magic. A truncated or HTML-error-page download
+        # would fail much later (inside unzip) with a less obvious message.
+        if [ "$(head -c 2 "$INPUT" 2>/dev/null)" != "PK" ]; then
+            warn "This file does not start with a ZIP signature (PK)."
+            warn "It may be a partial download or not a ZIP at all."
         fi
     fi
 }

@@ -421,6 +421,30 @@ if (source.includes(marker)) {
     const shim = SHIM_BODY;
     source = shim + source;
 
+    // The tray / window-frame / updater patches below are anchored to exact
+    // minified source, so a payload newer than the patch set loses them
+    // entirely. The env shim above is the patch that actually makes a window
+    // appear; the rest are cosmetic (empty tray menu, placeholder tray icon,
+    // frameless window, a macOS/Windows update feed). Aborting the whole build
+    // because a cosmetic anchor moved throws away something that works, so
+    // degrade to shim-only and say so loudly instead.
+    const uiAnchors = [
+        'this.tray = new electron.Tray(trayIcon);',
+        '!isMac && !isWindows && { frame: false }',
+        'windowLog.info("[WindowManager] Window ready to show");'
+    ];
+    const missingUiAnchors = uiAnchors.filter(function (a) { return !source.includes(a); });
+    const shimOnly = missingUiAnchors.length > 0;
+    if (shimOnly) {
+        console.warn('[apply-linux-patches] WARN: ' + missingUiAnchors.length + ' of ' +
+            uiAnchors.length + ' UI anchors are missing from this payload.');
+        console.warn('[apply-linux-patches] WARN: the app is newer than the UI patch set.');
+        console.warn('[apply-linux-patches] WARN: applying the env shim only. The window will');
+        console.warn('[apply-linux-patches] WARN: open, but the tray menu/icon and the Linux');
+        console.warn('[apply-linux-patches] WARN: window frame are left unpatched.');
+    }
+
+    if (!shimOnly) {
     const trayMarker = 'this.tray = new electron.Tray(trayIcon);';
     const trayIdx = source.indexOf(trayMarker);
     if (trayIdx < 0) {
@@ -622,8 +646,14 @@ if (source.includes(marker)) {
         }
     }
 
+    } // end of !shimOnly guard
+
     fs.writeFileSync(indexPath, source);
-    log('patched main/index.js (env shim + tray context menu + tray icon path + disabled updater)');
+    if (shimOnly) {
+        log('patched main/index.js (env shim only; UI patches skipped)');
+    } else {
+        log('patched main/index.js (env shim + tray context menu + tray icon path + disabled updater)');
+    }
 }
 
 // ---------------------------------------------------------------------------

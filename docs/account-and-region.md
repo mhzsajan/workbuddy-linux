@@ -65,6 +65,51 @@ The China `.deb` is the only desktop option, and it requires a +86 number.
 
 ---
 
+## Converting the international macOS build
+
+The international channel publishes a `.zip` (not a `.dmg`), and the converter
+in this repository accepts it. Verified end to end against
+`WorkBuddy-darwin-x64-5.9.4.42593613` on Ubuntu 26.04:
+
+| Property | Value |
+| --- | --- |
+| Archive | `WorkBuddy-darwin-x64-5.9.4.42593613-fa0a0901.zip`, 504,460,931 bytes |
+| Bundle | `WorkBuddy AI.app` |
+| Bundle id | `com.workbuddy.workbuddy-ai` (international, not `com.tencent.*`) |
+| Electron | 37.10.3 |
+| app.asar | 174 MB |
+
+The result does authenticate internationally. Its own log shows:
+
+```
+[NetLog] GET https://www.workbuddy.ai/v3/config -> DIRECT (status=200)
+[ElectronDesktopHost] shell.openExternal resolved for:
+  https://www.workbuddy.ai/login?platform=workbuddy-ai&state=…&version=5.9.4
+[UpdateService.linux] GET https://www.workbuddy.ai/v2/update?platform=workbuddy-linux-x64-deb
+```
+
+so it is a genuine international client, not a China build pointed at a
+different host. Because login is a `state` handshake plus token polling, that
+URL can be completed in a browser on **any** machine — the app collects the
+token by polling, so you do not need a browser on the Linux box.
+
+Two caveats specific to this conversion:
+
+- **The UI patch set does not apply.** All three tray/window anchors were
+  written against 4.22.10 and are absent from 5.9.4 (`0` matches each). The
+  patcher therefore applies the env shim only and says so. The window opens;
+  the tray menu and icon stay unpatched.
+- **The env shim is still required.** 5.9.4 writes a 367,263-byte
+  `ACC_PRODUCT_CONFIG_V3`, well past Linux's 128 KB `MAX_ARG_STRLEN`. Without
+  the shim every `execve()` fails with `E2BIG` and no window appears. With it,
+  the app logs `Spilled oversized ACC_PRODUCT_CONFIG_V3 … to avoid execve E2BIG`.
+- **Force the Ozone platform.** `--ozone-platform-hint=auto` resolves to X11
+  whenever `DISPLAY` is set and then aborts with `Missing X server or $DISPLAY`
+  on a Wayland-only session. The generated launcher now picks wayland/x11 from
+  `WAYLAND_DISPLAY`/`DISPLAY` explicitly.
+
+---
+
 ## What does work on Linux: the CLI
 
 `CodeBuddy Code` — the same product family, terminal form — is published to npm

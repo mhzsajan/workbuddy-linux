@@ -1,7 +1,8 @@
 # WorkBuddy for Linux (unofficial)
 
-Turns an **official macOS WorkBuddy DMG that you supply** into a native Linux
-application, and builds a `.deb` / `.rpm` / `.pkg.tar.zst` from it.
+Turns an **official WorkBuddy macOS build that you supply** — a China-channel
+`.dmg` or an international-channel `.zip` — into a native Linux application, and
+builds a `.deb` / `.rpm` / `.pkg.tar.zst` from it.
 
 A maintained fork of [`JipZeonGit/workbuddy-linux`](https://github.com/JipZeonGit/workbuddy-linux)
 (MIT). The approach is unchanged — this fork fixes the ways it used to fail
@@ -41,10 +42,10 @@ platform-neutral. So only the binary layer needs replacing:
 | Requirement | Notes |
 | --- | --- |
 | Architecture | **x86_64 only** — the toolchain downloads an x86_64 Electron runtime |
-| 7-Zip | **Version ≥ 21.** Older `p7zip` cannot extract modern DMGs |
+| 7-Zip | **Version ≥ 21**, DMG input only. ZIP input uses `unzip` and needs no 7-Zip |
 | Node.js | ≥ 20 (installed by `make deps` if your distro's is older) |
 | Disk | ~4 GB free |
-| Input | An official macOS WorkBuddy **`.dmg`** (universal build is fine) |
+| Input | An official WorkBuddy **`.dmg`** (China channel) or **`.zip`** (international channel), or an extracted `.app` |
 
 Tested package managers: `apt`, `dnf5`/`dnf`, `pacman`, `zypper`.
 
@@ -108,15 +109,28 @@ install decides whether you can log in at all**:
 | --- | --- | --- |
 | Login | phone (SMS) / WeChat | Google, GitHub OAuth |
 | Needs a +86 number | **yes** | no |
-| Desktop build for Linux | published | **not published** |
+| Official desktop build for Linux | published (`.deb`) | **none** |
+| Convertible with this toolchain | yes (`.dmg`) | **yes (`.zip`)** |
 
 If you are outside mainland China and have no +86 number, the China `.deb` is
-unusable — and there is no international Linux desktop build to fall back on.
-Tencent's international channel still advertises a Linux entry, but the artifact
-behind it is a stale `5.5.2` that returns 404; macOS and Windows are on `5.9.4`.
+unusable — and Tencent publishes no international Linux desktop build. Its
+international channel still advertises a Linux entry, but the artifact behind
+it is a stale `5.5.2` that returns 404; macOS and Windows are on `5.9.4`.
 
-What works on Linux with an international account is the **CLI**, which offers
-`Log in via International Site` (Google / GitHub):
+You can still get the **international desktop app** on Linux by converting
+Tencent's international macOS `.zip` with this toolchain:
+
+```bash
+./install.sh --fresh downloads/WorkBuddy-darwin-x64-5.9.4.42593613.zip
+```
+
+Verified working against 5.9.4 (Electron 37.10.3): the app fetches its config
+from `www.workbuddy.ai` and emits an international login URL that you can
+complete in a browser on any machine. Note that at this version the UI patch
+anchors no longer match, so the build runs the env shim only — the window opens,
+but the tray menu/icon are unpatched.
+
+Alternatively the **CLI** offers the same international login:
 
 ```bash
 npm install -g @tencent-ai/codebuddy-code

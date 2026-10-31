@@ -18,7 +18,12 @@ require_cmd() {
     command -v "$1" >/dev/null 2>&1 || error "Missing required command: $1"
 }
 
-find_7z() {
+# Locate 7-Zip, but return non-zero instead of aborting when it is absent.
+#
+# Only DMG input actually needs 7-Zip. The international build ships as a plain
+# .zip, which `unzip` handles, so treating 7-Zip as a hard dependency would
+# reject a working setup for no reason.
+find_7z_optional() {
     if command -v 7zz >/dev/null 2>&1; then
         command -v 7zz
         return 0
@@ -40,5 +45,10 @@ Please install the official 7zip package (version >= 21) instead:
         command -v 7z
         return 0
     fi
-    error "Missing 7z/7zz. Install 7zip."
+    return 1
+}
+
+find_7z() {
+    find_7z_optional || error "Missing 7z/7zz, which is required to extract DMG input.
+Install 7zip, or pass a .zip build instead (ZIP input only needs unzip)."
 }

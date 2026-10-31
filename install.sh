@@ -27,11 +27,12 @@ ASAR_PATCHED=0
 
 usage() {
     cat <<'HELP'
-Usage: ./install.sh [--fresh] [path/to/WorkBuddy.dmg | path/to/WorkBuddy.app]
+Usage: ./install.sh [--fresh] [path/to/WorkBuddy.dmg | WorkBuddy.zip | WorkBuddy.app]
 
 Builds a local Linux Electron app from a user-owned official WorkBuddy
-macOS Intel/x64 DMG or extracted .app bundle. With no path, the installer
-expects exactly one official DMG in downloads/.
+macOS archive: a China-channel .dmg, an international-channel .zip, or an
+already extracted .app bundle. With no path, the installer expects exactly
+one .dmg/.zip in downloads/.
 
 Environment:
   WORKBUDDY_INSTALL_DIR     Output app directory (default: ./workbuddy-app)
@@ -70,7 +71,8 @@ check_deps() {
     require_cmd node
     require_cmd npm
     require_cmd npx
-    find_7z >/dev/null
+    # 7-Zip is only needed for DMG input. resolve_app_bundle enforces it on that
+    # path; ZIP input uses unzip, so it must not be a blanket requirement here.
 }
 
 prepare_install_dir() {
@@ -201,8 +203,18 @@ export ELECTRON_FORCE_IS_PACKAGED=1
 # ship a SUID sandbox helper, so on most distros the renderer refuses to start
 # unless --no-sandbox is passed. If your kernel allows unprivileged user
 # namespaces you can re-enable it:
-#   WB_NO_SANDBOX=0 $APP_DIR/start.sh
-COMMON_FLAGS=(--disable-dev-shm-usage --in-process-gpu --ozone-platform-hint=auto --enable-wayland-ime)
+#   WB_NO_SANDBOX=0 \$APP_DIR/start.sh
+COMMON_FLAGS=(--disable-dev-shm-usage --in-process-gpu --enable-wayland-ime)
+
+# --ozone-platform-hint=auto resolves to X11 whenever DISPLAY happens to be set,
+# and then aborts with "Missing X server or \$DISPLAY" on Wayland-only sessions
+# (typical over SSH, systemd units, or a session that never exported DISPLAY).
+# Pick the platform explicitly from the environment instead of guessing.
+if [ -n "\${WAYLAND_DISPLAY:-}" ]; then
+  COMMON_FLAGS+=(--ozone-platform=wayland)
+elif [ -n "\${DISPLAY:-}" ]; then
+  COMMON_FLAGS+=(--ozone-platform=x11)
+fi
 
 if [ "\${WB_NO_SANDBOX:-1}" = "1" ]; then
   exec "\$APP_DIR/electron" --no-sandbox --disable-gpu-sandbox "\${COMMON_FLAGS[@]}" "\$@"
