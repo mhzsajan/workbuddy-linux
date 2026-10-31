@@ -1,0 +1,28 @@
+name: check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    name: Script syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Bash syntax (bash -n)
+        run: |
+          set -e
+          for f in install.sh scripts/*.sh scripts/lib/*.sh; do
+            echo "checking $f"
+            bash -n "$f"
+          done
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Patcher parses
+        run: node --check scripts/lib/apply-linux-patches.js
