@@ -55,14 +55,14 @@ Download the latest `.deb`, `.rpm` or AppImage from
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./kestrel_0.1.0_amd64.deb
+sudo apt install ./Kestrel_0.1.0_amd64.deb
 
 # Fedora / RHEL
-sudo dnf install ./kestrel-0.1.0-1.x86_64.rpm
+sudo dnf install ./Kestrel-0.1.0-1.x86_64.rpm
 
 # Any distro — AppImage
-chmod +x kestrel_0.1.0_amd64.AppImage
-./kestrel_0.1.0_amd64.AppImage
+chmod +x Kestrel_0.1.0_amd64.AppImage
+./Kestrel_0.1.0_amd64.AppImage
 ```
 
 ### Build from source
