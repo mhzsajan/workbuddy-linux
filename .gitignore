@@ -1,27 +1,43 @@
-# Dependencies
-node_modules/
-src-tauri/target/
+# Official upstream inputs and extracted application payloads.
+downloads/
+build/
+reference/
+*.dmg
+*.app/
+*.asar
+*.asar.unpacked/
 
-# Build output
+# Generated Linux applications and packages.
+workbuddy-app/
+workbuddy-app-next/
 dist/
-dist-ssr/
-*.local
+dist-next/
+*.deb
+*.rpm
+*.pkg.tar.zst
+.cache/
 
-# Tauri generated
-src-tauri/gen/
+# Local runtime caches.
+node-runtime/
+electron/
+node_modules/
 
-# Editor / OS
-.vscode/*
-!.vscode/extensions.json
-.idea/
+# Logs and temporary files.
+*.log
+*.tmp
+*.part
+
+# Local-only helper trees used during debugging / repacking.
+# Never commit: these may contain extracted upstream payloads.
+.asar-extract/
+.asar-tool/
+.test-repack.asar
+.test-repack.asar.unpacked/
+.tmp-asar-tool.js
+.tmp-asar-repack.js
+
+# OS/editor noise.
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
-npm-debug.log*
-
-# Local secrets - never commit credentials
-.env
-.env.*
-*.pem
+.vscode/
+.idea/

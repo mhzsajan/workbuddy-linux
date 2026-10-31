@@ -1,211 +1,162 @@
-# Kestrel
+# WorkBuddy for Linux (unofficial)
 
-**An open-source agent workbench for the desktop — built Linux-first.**
+Turns an **official macOS WorkBuddy DMG that you supply** into a native Linux
+application, and builds a `.deb` / `.rpm` / `.pkg.tar.zst` from it.
 
-[![build](https://github.com/mhzsajan/kestrel/actions/workflows/build.yml/badge.svg)](https://github.com/mhzsajan/kestrel/actions/workflows/build.yml)
-[![license: MIT](https://img.shields.io/badge/license-MIT-b0531f.svg)](LICENSE)
+A maintained fork of [`JipZeonGit/workbuddy-linux`](https://github.com/JipZeonGit/workbuddy-linux)
+(MIT). The approach is unchanged — this fork fixes the ways it used to fail
+silently. See [IMPROVEMENTS.md](IMPROVEMENTS.md) for the full list.
 
-Kestrel runs a tool-using AI agent against your own machine. It reads files,
-runs commands, edits code and searches the web — and it asks before it changes
-anything.
-
-Most desktop agent workbenches ship for macOS and Windows only, leaving Linux
-users with a browser tab. Kestrel targets Linux as a first-class platform:
-`.deb`, `.rpm` and AppImage builds are produced on every push.
-
-> **Status: v0.1.0, pre-release.** The interfaces are still moving and there are
-> no automated tests yet. Treat it as a foundation to build on, not a finished
-> product.
+> **This repository contains no Tencent software.** It is a converter, not a
+> distribution channel. You download the DMG from Tencent yourself; nothing is
+> redistributed here. Generated artifacts are gitignored and stay local.
 
 ---
 
-## Why another agent app?
+## How it works
 
-Because the interesting part is not the chat box — it is the permission model.
-Kestrel is built around one rule:
+WorkBuddy is an Electron/VS Code application, and its `app.asar` JavaScript is
+platform-neutral. So only the binary layer needs replacing:
 
-> **Every action that can change your machine must be approved, one call at a time.**
+1. Extract the DMG with 7-Zip.
+2. Read the Electron version out of the bundle's `Info.plist`.
+3. Download the matching **Linux x86_64** Electron runtime.
+4. Copy `app.asar` + `app.asar.unpacked` into the new app directory.
+5. Recompile the native modules (`node-pty`, `better-sqlite3`, …) against Linux
+   Electron headers — the macOS `.node` binaries cannot load on Linux.
+6. Patch `app.asar` for the Linux-specific failures below.
+7. Generate a launcher, desktop entry and icon, then package.
 
-Nothing is remembered, nothing is whitelisted, and the approval gate lives in
-the Rust process, not in the UI. A prompt-injected model cannot click its own
-"Allow" button.
+### What the patches fix
 
-## Features
-
-- **Real tool use** — shell, read, write, edit, list, search, fetch.
-- **Approval gate** — mutating tools pause and show you the exact arguments
-  before they run. Configurable: every call, writes only (default), or never.
-- **Diff preview** — every write or edit is rendered as a line diff, so you see
-  what changed before it lands.
-- **Provider agnostic** — OpenAI-compatible endpoints (OpenAI, Ollama, LM Studio,
-  vLLM, DeepSeek, Qwen, Moonshot, …) and the Anthropic Messages API.
-- **MCP support** — connect Model Context Protocol servers over stdio; each tool
-  becomes `mcp__<server>__<tool>`, still behind the approval gate.
-- **Small footprint** — Tauri rather than Electron: a native webview, ~10 MB
-  binaries, no bundled Chromium.
-- **Local settings** — API keys stay in a `0600` JSON file on your disk. No
-  account, no telemetry, no cloud round-trip.
-
-## Install
-
-### Linux (recommended)
-
-Download the latest `.deb`, `.rpm` or AppImage from
-[Releases](https://github.com/mhzsajan/kestrel/releases).
-
-```bash
-# Debian / Ubuntu
-sudo apt install ./Kestrel_0.1.0_amd64.deb
-
-# Fedora / RHEL
-sudo dnf install ./Kestrel-0.1.0-1.x86_64.rpm
-
-# Any distro — AppImage
-chmod +x Kestrel_0.1.0_amd64.AppImage
-./Kestrel_0.1.0_amd64.AppImage
-```
-
-### Build from source
-
-Requires Node 20+, Rust 1.77+, and the WebKitGTK development headers.
-
-```bash
-# Debian / Ubuntu
-sudo apt update
-sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-
-# Fedora
-sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
-  libappindicator-gtk3-devel librsvg2-devel
-
-# Arch
-sudo pacman -S webkit2gtk-4.1 base-devel curl wget file openssl \
-  appmenu-gtk-module gtk3 libappindicator-gtk3 librsvg
-```
-
-```bash
-git clone https://github.com/mhzsajan/kestrel.git
-cd kestrel
-npm install
-npm run tauri dev      # development, hot reload
-npm run tauri build    # bundles land in src-tauri/target/release/bundle/
-```
-
-To work on the UI alone, `npm run dev` serves the frontend in a browser with a
-simulated backend — no Rust toolchain needed.
-
-## Configure
-
-Open **Settings** in the sidebar and set:
-
-| Field | Notes |
+| Patch | Symptom it fixes |
 | --- | --- |
-| Provider | OpenAI, Anthropic, or Ollama are preconfigured; edit any of them |
-| Base URL | `https://api.openai.com/v1`, `http://localhost:11434/v1`, … |
-| Model | e.g. `gpt-4o`, `claude-sonnet-4-5`, `qwen2.5-coder` |
-| API key | Leave blank for a local server |
-| Workspace | Relative tool paths resolve here; absolute paths still work |
+| `process.env` shim | A ~260 KB config string in an env var exceeds Linux's 128 KB `MAX_ARG_STRLEN`, so every `execve()` fails with `E2BIG` and **no window ever appears** |
+| Tray context menu | libayatana-appindicator never emits `click`, so the tray menu is empty unless `setContextMenu()` is called explicitly |
+| Tray icon path | The AppIndicator backend cannot read an in-memory `NativeImage`, so the tray shows a broken-image placeholder; an on-disk PNG is used instead |
+| Sidecar spawn | Large env entries are spilled to temp files before spawning |
 
-Settings are stored at:
+## Requirements
 
-- Linux — `~/.config/kestrel/settings.json`
-- macOS — `~/Library/Application Support/kestrel/settings.json`
-- Windows — `%APPDATA%\kestrel\settings.json`
+| Requirement | Notes |
+| --- | --- |
+| Architecture | **x86_64 only** — the toolchain downloads an x86_64 Electron runtime |
+| 7-Zip | **Version ≥ 21.** Older `p7zip` cannot extract modern DMGs |
+| Node.js | ≥ 20 (installed by `make deps` if your distro's is older) |
+| Disk | ~4 GB free |
+| Input | An official macOS WorkBuddy **`.dmg`** (universal build is fine) |
 
-The file is written with owner-only permissions because it holds your API key.
+Tested package managers: `apt`, `dnf5`/`dnf`, `pacman`, `zypper`.
 
-## Tools
+> **Ubuntu 22.04 note:** the `7zip` package only exists from 24.04 onwards, and
+> 22.04's `p7zip` is too old. `make deps` now detects this and tells you how to
+> install the official static build. 24.04+ is the supported path.
 
-| Tool | Mutating | What it does |
-| --- | :---: | --- |
-| `run_shell` | yes | Runs a command via `sh -lc` (Unix) or `cmd /C` (Windows), with a timeout |
-| `read_file` | no | Reads a file with line numbers |
-| `write_file` | yes | Creates or overwrites a file |
-| `edit_file` | yes | Exact-string replacement, one occurrence by default |
-| `list_dir` | no | Lists a directory, 1–3 levels deep |
-| `search_files` | no | Regex search across a tree, skipping `.git`, `node_modules`, `target` |
-| `web_fetch` | no | Fetches a URL and strips it to readable text |
+## Quick start
 
-Tool output is capped at 20,000 characters before it goes back to the model, so
-a runaway `ls -R` cannot blow up your context window.
+```bash
+git clone https://github.com/mhzsajan/workbuddy-linux
+cd workbuddy-linux
 
-## MCP servers
+make deps                      # system packages + Node 20+
 
-In **MCP servers**, add a name, a command and its arguments:
+mkdir -p downloads             # download the macOS DMG from workbuddy.ai
+                               # put exactly ONE .dmg in here
 
-```
-name:    filesystem
-command: npx
-args:    -y @modelcontextprotocol/server-filesystem /home/you/projects
-```
+make preflight                 # arch, disk, 7-Zip, Node, input sanity
+make build-app                 # extract, swap runtime, rebuild natives, patch
+make run-app                   # test before packaging anything
 
-Kestrel spawns the server, completes the `initialize` handshake, lists its tools
-and registers them. MCP calls are always confirmed in the default approval mode,
-because a third-party server can act outside this app.
-
-## Security model
-
-Be clear-eyed about what this is: **a program that runs model-generated commands
-on your computer.** The approval gate is a seatbelt, not a sandbox.
-
-- Approvals are per-call and never cached. The agent cannot approve itself.
-- The gate is enforced in Rust before execution, not in the React layer.
-- API keys are stored locally with `0600` permissions and are never sent
-  anywhere except your chosen provider.
-- Shell commands inherit your user's privileges. There is **no** OS-level
-  sandbox yet — `run_shell` can do anything you could do in a terminal.
-
-If you need real isolation today, run Kestrel in a container or a VM. An
-optional bubblewrap/Landlock sandbox is on the roadmap; see [SECURITY.md](SECURITY.md).
-
-## Architecture
-
-```
-src/                     React + TypeScript frontend
-  components/            chat, tool cards, diff view, approval dialog, settings
-  lib/store.ts           zustand state
-  lib/api.ts             typed wrappers over Tauri commands
-  lib/diff.ts            line-level LCS diff
-  lib/demo.ts            browser-only simulated backend
-
-src-tauri/src/
-  lib.rs                 Tauri commands and app wiring
-  agent.rs               the agent loop and approval gate
-  providers/             OpenAI-compatible and Anthropic streaming clients
-  tools/                 tool registry and implementations
-  mcp/                   MCP stdio client (JSON-RPC 2.0)
-  config.rs              settings load/save
-  state.rs               shared state
+make package                   # .deb / .rpm / .pkg.tar.zst into dist/
+make install                   # dpkg -i + dependency repair
 ```
 
-A turn flows like this:
+Prefer to point at a file directly?
 
-1. `send_message` spawns the agent loop.
-2. The loop streams the model's reply to the UI via events.
-3. If the model asks for tools, each mutating call emits an approval request and
-   **awaits your answer on a oneshot channel**.
-4. The tool runs, its output goes back into the conversation, and the loop
-   repeats — up to `max_iterations` (default 25).
+```bash
+make build-app DMG=/home/you/Downloads/WorkBuddy.dmg
+```
 
-## Roadmap
+## Environment variables
 
-- [ ] Cancel a running turn (currently you can only wait it out)
-- [ ] Persist sessions to disk
-- [ ] Optional sandbox for `run_shell` (bubblewrap / Landlock)
-- [ ] Git-aware diffs and hunk-level accept/reject
-- [ ] Provider registry with per-provider defaults
-- [ ] Integration tests for the agent loop and diff engine
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `WB_ALLOW_UNPATCHED` | `0` | `1` lets the build continue when patching fails. The result will almost certainly show no window. |
+| `WB_NO_SANDBOX` | `1` | `0` re-enables Electron's Chromium sandbox (needs unprivileged user namespaces). |
+| `WORKBUDDY_INSTALL_DIR` | `./workbuddy-app` | Where the converted app is assembled. |
+| `ELECTRON_VERSION` | auto-detected | Force a runtime version if detection falls back. |
+| `ELECTRON_MIRROR` | — | Mirror for the Electron runtime download. |
+| `ELECTRON_HEADERS_URL` | — | Headers dist URL used for native rebuilds. |
 
-## Contributing
+## Troubleshooting
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
-The most useful contributions right now are bug reports from real Linux desktops
-(GNOME, KDE, Wayland) and the sandbox work.
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Build says patches failed, exit 4 or 5 | The DMG is newer than the patch anchors support | Use an older DMG, or open an issue with the version and exit code |
+| App starts but no window | `app.asar` was not patched | Check `asarPatched` in `.workbuddy-linux/build-info.json` |
+| `make deps` fails on 7-Zip | Ubuntu 22.04 has no `7zip` package | Install the static build, see above |
+| `dpkg` leaves the package unconfigured | Missing dependencies | `sudo apt-get install -f` (now run automatically by `make install`) |
+| Blank window on Wayland | GPU/compositing issue | `./workbuddy-app/start.sh --disable-gpu` |
+| Tray icon is a broken image | Icon PNG not written | Verify `workbuddy-app/.workbuddy-linux/workbuddy.png` exists |
 
-## License
+## Known limitations
 
-MIT. See [LICENSE](LICENSE).
+These come from upstream and are **not** fixed by this fork:
 
-Kestrel is an independent project. It is not affiliated with, endorsed by, or
-derived from any commercial agent product.
+- **Tencent Docs engine removed** — `@tencent/docs-engine` ships only a macOS
+  arm64 `.dylib`, which would `dlopen`-crash on Linux.
+- **AI code sandbox degraded** — Tencent's proprietary `vendor/sandbox` has no
+  Linux build, so code execution falls back to an unsandboxed terminal or is
+  refused.
+- **No auto-update** — upstream relies on macOS ShipIt / Windows Squirrel.
+  Re-run the pipeline with a newer DMG to update.
+- **Patch anchors are exact strings.** The patcher matches minified upstream
+  code. It now fails loudly when an anchor is missing instead of producing a
+  broken app, but it still cannot patch a structurally different version.
+
+## Security
+
+The generated launcher runs Electron with `--no-sandbox` by default, because
+upstream does not ship a SUID sandbox helper. That disables the Chromium
+renderer sandbox, while the application can execute AI-generated commands.
+Combined with the missing code sandbox above, treat this as **running untrusted
+code with your user privileges**. Use a VM or container if that matters.
+
+## Legal
+
+- Not affiliated with, endorsed by, or supported by Tencent.
+- No Tencent binaries are stored or redistributed by this repository. You supply
+  the DMG; all generated artifacts stay on your machine.
+- Converting a macOS-licensed application to run on another OS may conflict with
+  WorkBuddy's EULA. That decision is yours.
+- **Do not report problems from this conversion to Tencent support.**
+
+## History
+
+This repository previously held an unrelated desktop agent application. That
+code is still reachable in the git history; the current tree is the Linux
+conversion toolchain only.
+
+---
+
+## 简体中文
+
+本项目是 [`JipZeonGit/workbuddy-linux`](https://github.com/JipZeonGit/workbuddy-linux)
+的维护分支（MIT），原理不变：把**你自行下载的官方 macOS DMG** 转换成可在 Linux
+运行的 Electron 应用，并打包为 `.deb` / `.rpm` / `.pkg.tar.zst`。
+
+与上游相比，主要修复的是**失败被静默吞掉**的问题：补丁失败以前只打印一行警告
+然后继续，最终得到一个「启动后没有窗口」的包；现在会直接中止构建并说明原因。
+完整改动见 [IMPROVEMENTS.md](IMPROVEMENTS.md)。
+
+```bash
+make deps
+mkdir -p downloads      # 放入唯一一份官方 macOS DMG
+make preflight
+make build-app
+make run-app
+make package && make install
+```
+
+本仓库**不分发任何腾讯二进制文件**，仅作为转换工具。由此产生的任何问题请勿反馈给
+官方客服。
