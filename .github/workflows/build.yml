@@ -16,7 +16,7 @@ jobs:
     name: Linux bundles
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Tauri on Linux needs WebKitGTK plus a few packaging tools.
       - name: Install system dependencies
@@ -34,7 +34,7 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -54,7 +54,7 @@ jobs:
       - name: Build .deb, .rpm and AppImage
         run: npx tauri build --bundles deb,rpm,appimage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: kestrel-linux-x86_64
           if-no-files-found: error
@@ -71,7 +71,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
