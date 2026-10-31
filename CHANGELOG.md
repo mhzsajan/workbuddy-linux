@@ -10,6 +10,24 @@ build toolchain only. You supply the official WorkBuddy macOS archive.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-31
+
+A documentation release. No converter code changed; this records the first
+end-to-end run through packaging and installation, which 1.2.0 only claimed.
+
+### Added
+
+- `docs/verification.md` — the full evidence trail for one real run: the input
+  archive and its checksum, the 918 MB converted tree, the 279 MB `.deb`, the
+  `dpkg -i` output, and the runtime log proving the app talks to
+  `www.workbuddy.ai`. Also states plainly what was *not* verified (tray icon,
+  `.rpm` / `.pkg.tar.zst`, ARM).
+
+### Fixed
+
+- README no longer implies the tray icon works on 5.9.4. It is a known
+  limitation, not a silent failure.
+
 ## [1.2.0] - 2026-10-31
 
 Adds the international edition, which is the only way to get a

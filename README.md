@@ -271,6 +271,11 @@ These come from upstream and are **not** fixed by this fork:
   code. It now fails loudly when a required anchor is missing instead of
   producing a broken app, but it still cannot patch a structurally different
   version.
+- **The tray icon does not appear on 5.9.4.** All three tray/window anchors are
+  absent from that build, so those cosmetic patches are skipped by design.
+
+What was actually run, on what hardware, with which outputs:
+[docs/verification.md](docs/verification.md).
 
 ## Security
 
