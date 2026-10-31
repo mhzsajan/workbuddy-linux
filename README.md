@@ -99,6 +99,37 @@ make build-app DMG=/home/you/Downloads/WorkBuddy.dmg
 | Blank window on Wayland | GPU/compositing issue | `./workbuddy-app/start.sh --disable-gpu` |
 | Tray icon is a broken image | Icon PNG not written | Verify `workbuddy-app/.workbuddy-linux/workbuddy.png` exists |
 
+## Accounts and regions
+
+WorkBuddy has two editions with separate account systems, and **the edition you
+install decides whether you can log in at all**:
+
+| | China edition | International edition |
+| --- | --- | --- |
+| Login | phone (SMS) / WeChat | Google, GitHub OAuth |
+| Needs a +86 number | **yes** | no |
+| Desktop build for Linux | published | **not published** |
+
+If you are outside mainland China and have no +86 number, the China `.deb` is
+unusable — and there is no international Linux desktop build to fall back on.
+Tencent's international channel still advertises a Linux entry, but the artifact
+behind it is a stale `5.5.2` that returns 404; macOS and Windows are on `5.9.4`.
+
+What works on Linux with an international account is the **CLI**, which offers
+`Log in via International Site` (Google / GitHub):
+
+```bash
+npm install -g @tencent-ai/codebuddy-code
+codebuddy --serve --host 127.0.0.1 --port 7788   # prints a password-protected URL
+```
+
+Do not try to repoint the China build's auth endpoint at `www.workbuddy.ai` —
+tokens are region-bound (`authStateReplication: "regional"`) and the trusted
+origins are a fixed `.cn` allowlist, so it cannot work.
+
+Full evidence, API responses and the SSH port-forward recipe:
+[docs/account-and-region.md](docs/account-and-region.md).
+
 ## Known limitations
 
 These come from upstream and are **not** fixed by this fork:
@@ -160,3 +191,20 @@ make package && make install
 
 本仓库**不分发任何腾讯二进制文件**，仅作为转换工具。由此产生的任何问题请勿反馈给
 官方客服。
+
+### 关于账号与地区（重要）
+
+WorkBuddy 分国内版与国际版，**两个账号体系互不通用**：国内版用手机号/微信登录，
+国际版用 Google / GitHub 登录。国内版 `.deb` 只认 +86 手机号；而国际版**没有发布
+Linux 桌面版**（官方更新接口里 Linux 条目停留在 5.5.2，实际文件已 404，macOS /
+Windows 已到 5.9.4）。
+
+在 Linux 上要使用国际版账号，请改用 CLI：
+
+```bash
+npm install -g @tencent-ai/codebuddy-code
+codebuddy --serve --host 127.0.0.1 --port 7788
+```
+
+首次启动的登录方式选择界面里选 **Log in via International Site** 即可。详细证据与
+远程端口转发方法见 [docs/account-and-region.md](docs/account-and-region.md)。
