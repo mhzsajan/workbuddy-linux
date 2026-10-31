@@ -1,0 +1,117 @@
+name: release
+
+# Builds and publishes the release assets for a tag.
+#
+# What ships: the toolchain source bundle, the bootstrap installer and their
+# checksums. What does not ship: a converted WorkBuddy application, because its
+# payload is Tencent's proprietary app.asar. See CHANGELOG.md and README.md.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 1.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release assets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            ver="${{ inputs.version }}"
+          else
+            ver="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "releasing v$ver"
+
+      - name: Bash syntax (bash -n)
+        run: |
+          set -e
+          for f in install.sh scripts/*.sh scripts/lib/*.sh; do
+            echo "checking $f"
+            bash -n "$f"
+          done
+
+      - name: Patcher parses
+        run: node --check scripts/lib/apply-linux-patches.js
+
+      - name: Build release assets
+        run: bash scripts/make-release.sh "${{ steps.v.outputs.version }}"
+
+      - name: Extract changelog section
+        run: |
+          set -e
+          ver="${{ steps.v.outputs.version }}"
+          out="dist/release/RELEASE_NOTES.md"
+          awk -v v="$ver" '
+            $0 ~ "^## \\[" v "\\]" { inside = 1; next }
+            inside && /^## \[/     { exit }
+            inside                 { print }
+          ' CHANGELOG.md > "$out"
+          if [ ! -s "$out" ]; then
+            echo "No CHANGELOG section for v$ver; falling back to the whole file." >&2
+            cp CHANGELOG.md "$out"
+          fi
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Installation"
+            echo ""
+            echo '```bash'
+            echo "curl -fsSLO https://github.com/${GITHUB_REPOSITORY}/releases/download/v${ver}/install-workbuddy.sh"
+            echo "chmod +x install-workbuddy.sh"
+            echo "./install-workbuddy.sh /path/to/WorkBuddy.dmg   # or .zip"
+            echo '```'
+            echo ""
+            echo "These assets contain the build toolchain only. The converted"
+            echo "application is produced locally from an official WorkBuddy macOS"
+            echo "archive that you obtain from Tencent yourself, because its payload"
+            echo "is Tencent's proprietary \`app.asar\` and is not redistributed here."
+          } >> "$out"
+          echo "--- notes ---"
+          cat "$out"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          ver="${{ steps.v.outputs.version }}"
+          tag="v$ver"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag exists; uploading assets to it."
+            gh release upload "$tag" \
+              "dist/release/workbuddy-linux-$ver.tar.gz" \
+              dist/release/install-workbuddy.sh \
+              dist/release/SHA256SUMS \
+              --clobber
+            gh release edit "$tag" --notes-file dist/release/RELEASE_NOTES.md
+          else
+            gh release create "$tag" \
+              "dist/release/workbuddy-linux-$ver.tar.gz" \
+              dist/release/install-workbuddy.sh \
+              dist/release/SHA256SUMS \
+              --title "v$ver" \
+              --notes-file dist/release/RELEASE_NOTES.md \
+              --latest
+          fi
