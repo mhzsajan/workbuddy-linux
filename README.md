@@ -313,6 +313,7 @@ code with your user privileges**. Use a VM or container if that matters.
 - [`JipZeonGit/codebuddy-ide-cn-linux`](https://github.com/JipZeonGit/codebuddy-ide-cn-linux) — the same author's CodeBuddy IDE port; its AUR and AppImage packaging are worth reading
 - [`electron/electron`](https://github.com/electron/electron) — the runtime the payload is rehosted on
 - [`electron/asar`](https://github.com/electron/asar) — used to unpack and repack `app.asar`
+- [`laiagek/workbuddy-intl-linux`](https://github.com/laiagek/workbuddy-intl-linux) — a different pipeline for the same missing Linux build: the official Windows payload plus the domestic deb's Electron runtime, packaged as an Arch package with every input pinned by SHA-256
 
 ## History
 
